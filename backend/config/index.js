@@ -61,7 +61,9 @@ const config = {
   },
 
   sending: {
-    dryRun: bool(process.env.DRY_RUN, true), // safe default: never send unless explicitly disabled
+    // Starting value only; the dashboard checkbox can switch it (unless DRY_RUN_LOCKED=true).
+    dryRun: bool(process.env.DRY_RUN, true), // safe default: never send unless switched off
+    dryRunLocked: bool(process.env.DRY_RUN_LOCKED, false), // true = force dry-run, checkbox disabled
     delayMs: int(process.env.EMAIL_DELAY_MS, 30000),
     batchSize: Math.max(1, int(process.env.BATCH_SIZE, 20)),
     batchPauseMs: int(process.env.BATCH_PAUSE_MS, 120000),

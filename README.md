@@ -175,7 +175,7 @@ Going live:
 3. Check that it arrived with the resume attached.
 4. Then start a campaign.
 
-While `.env` has `DRY_RUN=true`, the dashboard can't switch dry-run off. With `DRY_RUN=false`, the dashboard checkbox lets you turn dry-run back on at any time.
+`DRY_RUN` is only the starting value. You can switch it either way with the **Dry-run mode** checkbox in Settings, and turning it off asks for confirmation. To force dry-run and disable the checkbox, set `DRY_RUN_LOCKED=true`. On hosts whose filesystem is wiped on restart, such as Render's free plan, the checkbox choice is lost on restart and the app goes back to `DRY_RUN`, which is the safe direction.
 
 ## 9. Sending behaviour and limits
 

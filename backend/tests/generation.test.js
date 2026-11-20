@@ -16,6 +16,8 @@ const { storeRecords, parseManualText, importManual } = await import('../service
 const Recruiters = await import('../models/recruiter.model.js');
 const { DEFAULT_TEMPLATE, DEFAULT_GENERIC_TEMPLATE, templateKindFor, templateFor, getTemplate, saveTemplate } = await import('../models/template.model.js');
 const { classifyError } = await import('../services/gmail.service.js');
+const { getSendSettings, setSetting } = await import('../models/settings.model.js');
+const configMod = (await import('../config/index.js')).default;
 const { EXPECTED } = await import('../sample-data/generate-samples.js');
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'sample-data');
@@ -153,4 +155,16 @@ test('main and generic templates are saved independently', () => {
   saveTemplate('generic', { subject: 'Generic S', body_html: '<p>G</p>' });
   assert.equal(getTemplate('generic').subject, 'Generic S');
   assert.notEqual(getTemplate('main').subject, 'Generic S');
+});
+
+test('dry-run: DRY_RUN is the default, the dashboard checkbox overrides it, DRY_RUN_LOCKED forces it', () => {
+  assert.equal(getSendSettings().dryRun, true); // DRY_RUN=true in this test env
+  setSetting('dryRun', false);
+  assert.equal(getSendSettings().dryRun, false); // checkbox turned it off
+  configMod.sending.dryRunLocked = true;
+  assert.equal(getSendSettings().dryRun, true); // lock wins
+  assert.equal(getSendSettings().dryRunLockedByEnv, true);
+  configMod.sending.dryRunLocked = false;
+  setSetting('dryRun', true);
+  assert.equal(getSendSettings().dryRun, true);
 });

@@ -12,7 +12,9 @@ export const history = (req, res) => res.json(getHistory(req.query));
 
 /** GET /api/settings – never includes credentials */
 export const getSettings = (req, res) =>
-  res.json({ ...getSendSettings(), ...publicConfig(), senderEmail: publicConfig().gmailUser, resume: getResumeInfo() });
+  // getSendSettings() goes last: its dryRun includes the dashboard toggle, while
+  // publicConfig().dryRun is only the .env default.
+  res.json({ ...publicConfig(), ...getSendSettings(), senderEmail: publicConfig().gmailUser, resume: getResumeInfo() });
 
 /** PUT /api/settings */
 export function updateSettings(req, res) {

@@ -82,7 +82,7 @@ export default function SettingsPanel({ settings, onChange, notify }) {
             Dry-run mode <span className="text-xs text-slate-500">(build emails, send nothing)</span>
           </span>
         </label>
-        {settings.dryRunLockedByEnv && <div className="text-xs text-slate-500">Locked on by DRY_RUN=true in backend/.env</div>}
+        {settings.dryRunLockedByEnv && <div className="text-xs text-slate-500">Locked on by DRY_RUN_LOCKED=true on the server</div>}
       </div>
 
       <div className="grid grid-cols-2 gap-3">

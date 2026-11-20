@@ -26,7 +26,7 @@ export const EDITABLE = ['senderName', 'senderPhone', 'delayMs', 'batchSize', 'b
 
 export function getSendSettings() {
   const s = config.sending;
-  const dryRunSetting = getSetting('dryRun', s.dryRun);
+  const dryRunSetting = getSetting('dryRun', null); // null = never toggled in the dashboard
   return {
     senderName: getSetting('senderName', config.sender.name),
     senderPhone: getSetting('senderPhone', config.sender.phone),
@@ -36,8 +36,9 @@ export function getSendSettings() {
     batchPauseMs: Number(getSetting('batchPauseMs', s.batchPauseMs)),
     dailyLimit: Number(getSetting('dailyLimit', s.dailyLimit)),
     maxRetries: s.maxRetries,
-    // DRY_RUN=true in .env is a hard lock; the UI can only turn dry-run ON, never off.
-    dryRun: s.dryRun || Boolean(dryRunSetting),
-    dryRunLockedByEnv: s.dryRun,
+    // DRY_RUN in .env is the default; the dashboard checkbox overrides it.
+    // DRY_RUN_LOCKED=true forces dry-run regardless (checkbox disabled).
+    dryRun: s.dryRunLocked ? true : dryRunSetting === null ? s.dryRun : Boolean(dryRunSetting),
+    dryRunLockedByEnv: s.dryRunLocked,
   };
 }
