@@ -192,6 +192,44 @@ While `.env` has `DRY_RUN=true`, the dashboard can't switch dry-run off. With `D
 - **Permanent recipient error** (e.g. user unknown) marks that row `failed` and moves on. Failed rows can be selected and sent again.
 - Every attempt, retry and skip is recorded in **History** and `backend/logs/`.
 
+## Deploying (Vercel frontend + Render backend)
+
+The frontend calls the backend URL in `VITE_API_URL`. It's set in `frontend/.env.production`, which currently points to `https://job-mailer-backend-amfp.onrender.com`. A `VITE_API_URL` env var set in Vercel overrides it. The value is baked in at build time, so redeploy the frontend after changing it.
+
+**Render (backend: Web Service)**
+
+| Setting | Value |
+|---|---|
+| Root Directory | `backend` |
+| Build Command | `npm install` |
+| Start Command | `npm start` |
+
+Environment variables:
+
+| Variable | Value |
+|---|---|
+| `NODE_ENV` | `production` (listens on 0.0.0.0 and requires `APP_PASSWORD`) |
+| `APP_PASSWORD` | a strong password; the dashboard asks for it |
+| `FRONTEND_ORIGIN` | your Vercel URL, e.g. `https://job-mailer.vercel.app` (comma-separate several) |
+| `GMAIL_USER`, `GMAIL_APP_PASSWORD` | Gmail credentials |
+| `SENDER_NAME`, `SENDER_PHONE` | your signature |
+| `DRY_RUN` | `true` until you've tested |
+| `DATA_DIR` | optional: mount path of a persistent disk |
+
+Do **not** set `HOST`; it defaults to `0.0.0.0` in production.
+
+**Vercel (frontend):** Root Directory `frontend`, Framework Preset `Vite` (build `npm run build`, output `dist`).
+
+**Check it works**
+- `https://<backend>/api/health` returns `{"ok":true,"authRequired":true}`.
+- `/api/stats` without a password returns 401.
+- The Vercel URL shows a login screen; enter `APP_PASSWORD`.
+
+**Free-plan caveats**
+- **Data is wiped.** Render's free filesystem resets on every deploy and restart, which removes the SQLite database, your uploaded resume and the history. For data that lasts, add a persistent disk and set `DATA_DIR` to its mount path (e.g. `/var/data`).
+- **Slow first load.** A free instance sleeps after about 15 minutes idle, so the first request takes about a minute.
+- **Campaigns pause.** If the instance sleeps or restarts mid-campaign, the campaign is paused. Resume it from the dashboard.
+
 ## 10. Responsible use
 
 - Every send needs an explicit confirmation in the dashboard, and the API rejects requests without `confirm: true`.

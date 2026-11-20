@@ -1,11 +1,55 @@
-/** Thin fetch wrapper around the backend API. Throws Error(message) on non-2xx. */
+/**
+ * Thin fetch wrapper around the backend API. Throws Error(message) on non-2xx.
+ *
+ * API_BASE: deployed builds call the backend URL from VITE_API_URL (e.g. on Render).
+ * Empty in local dev, where Vite proxies /api to the local backend.
+ */
+export const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
+// ---- password (stored in this browser only) ----
+const KEY = 'jobMailerPassword';
+export const auth = {
+  get: () => {
+    try {
+      return localStorage.getItem(KEY) || '';
+    } catch {
+      return '';
+    }
+  },
+  set: (pw) => {
+    try {
+      localStorage.setItem(KEY, pw);
+    } catch {
+      /* private mode: password lasts for this page load only */
+    }
+    memoryPassword = pw;
+  },
+  clear: () => {
+    try {
+      localStorage.removeItem(KEY);
+    } catch {
+      /* ignore */
+    }
+    memoryPassword = '';
+  },
+  onUnauthorized: () => {}, // replaced by App to show the login screen
+};
+let memoryPassword = '';
+const password = () => memoryPassword || auth.get();
+
+function headers(extra = {}) {
+  const pw = password();
+  return { ...extra, ...(pw ? { Authorization: `Bearer ${pw}` } : {}) };
+}
+
 async function request(path, { method = 'GET', body, form } = {}) {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE}/api${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: headers(body ? { 'Content-Type': 'application/json' } : {}),
     body: form || (body ? JSON.stringify(body) : undefined),
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) auth.onUnauthorized();
   if (!res.ok) {
     const err = new Error(data.error || `Request failed (${res.status})`);
     err.status = res.status;
@@ -22,6 +66,18 @@ const fileForm = (field, file) => {
 };
 
 export const api = {
+  health: () => request('/health'),
+  /** Checks a password without saving it. */
+  checkPassword: async (pw) => {
+    const res = await fetch(`${API_BASE}/api/auth/check`, { headers: { Authorization: `Bearer ${pw}` } });
+    return res.ok;
+  },
+  /** Fetches the stored resume with the auth header and returns a temporary object URL. */
+  resumeBlobUrl: async () => {
+    const res = await fetch(`${API_BASE}/api/resume/file`, { headers: headers() });
+    if (!res.ok) throw new Error(res.status === 404 ? 'No resume uploaded' : `Could not load resume (${res.status})`);
+    return URL.createObjectURL(await res.blob());
+  },
   stats: () => request('/stats'),
   settings: () => request('/settings'),
   saveSettings: (s) => request('/settings', { method: 'PUT', body: s }),

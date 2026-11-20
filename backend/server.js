@@ -7,7 +7,8 @@ import path from 'node:path';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
-import config, { ROOT_DIR, publicConfig } from './config/index.js';
+import config, { ROOT_DIR, publicConfig, isProduction } from './config/index.js';
+import { requireAuth } from './utils/auth.js';
 import { getDb, closeDb } from './config/db.js';
 import api from './routes/index.js';
 import { errorHandler, notFound } from './utils/errors.js';
@@ -16,6 +17,13 @@ import { releaseAllQueued } from './models/recruiter.model.js';
 import { pauseOrphanedCampaigns } from './models/campaign.model.js';
 import { getDefaultTemplate } from './models/template.model.js';
 import { closeTransport } from './services/gmail.service.js';
+
+// ---- Refuse to run publicly without a password ----
+if (isProduction && !config.appPassword) {
+  logger.error('APP_PASSWORD is not set. Refusing to start in production: the API would be open to anyone. Set APP_PASSWORD in your host\'s environment variables.');
+  process.exit(1);
+}
+if (!config.appPassword) logger.warn('APP_PASSWORD not set: API has no login (fine for local use only).');
 
 // ---- Boot: DB + crash recovery ----
 getDb();
@@ -26,11 +34,17 @@ if (released || paused) logger.warn(`Recovered from unclean shutdown: ${released
 
 const app = express();
 app.disable('x-powered-by');
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
-app.use(cors({ origin: config.frontendOrigin }));
+app.set('trust proxy', 1); // behind Render/Railway proxy
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(
+  cors({
+    origin: (origin, cb) => cb(null, !origin || config.frontendOrigins.includes(origin.replace(/\/$/, ''))),
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }),
+);
 app.use(express.json({ limit: '200kb' }));
 
-app.use('/api', api);
+app.use('/api', requireAuth, api);
 
 // Serve the built frontend if present (npm run build in frontend/), so one process is enough.
 const dist = path.resolve(ROOT_DIR, '..', 'frontend', 'dist');
@@ -44,7 +58,7 @@ app.use(errorHandler);
 
 const server = app.listen(config.port, config.host, () => {
   const pc = publicConfig();
-  logger.info(`API listening on http://${config.host}:${config.port}`);
+  logger.info(`API listening on http://${config.host}:${config.port} (allowed origins: ${config.frontendOrigins.join(', ')})`);
   logger.info(`DRY_RUN=${pc.dryRun}  Gmail configured=${pc.smtpConfigured}${pc.gmailUser ? ` (${pc.gmailUser})` : ''}`);
 });
 

@@ -15,10 +15,24 @@ const int = (v, def) => {
   return Number.isFinite(n) && n >= 0 ? n : def;
 };
 
+export const isProduction = process.env.NODE_ENV === 'production';
+
+// Where the database and uploads live. Point this at a persistent disk in production.
+const DATA_DIR = path.resolve(process.env.DATA_DIR || ROOT_DIR);
+
 const config = {
   port: int(process.env.PORT, 5000),
-  host: process.env.HOST || '127.0.0.1',
-  frontendOrigin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
+  // Hosts (Render, Railway…) must reach the server from outside the container -> 0.0.0.0.
+  // Locally we stay on 127.0.0.1 so the API is not exposed on your network.
+  host: process.env.HOST || (isProduction ? '0.0.0.0' : '127.0.0.1'),
+  // Comma-separated list of allowed browser origins (your Vercel URL, localhost…).
+  frontendOrigins: (process.env.FRONTEND_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map((o) => o.trim().replace(/\/$/, ''))
+    .filter(Boolean),
+
+  // Password required for every API call (except /api/health). Required in production.
+  appPassword: process.env.APP_PASSWORD || '',
 
   gmail: {
     user: (process.env.GMAIL_USER || '').trim(),
@@ -43,12 +57,12 @@ const config = {
   uploads: {
     maxUploadBytes: int(process.env.MAX_UPLOAD_MB, 10) * 1024 * 1024,
     maxResumeBytes: int(process.env.MAX_RESUME_MB, 5) * 1024 * 1024,
-    dataDir: path.join(ROOT_DIR, 'uploads', 'data'),
-    resumeDir: path.join(ROOT_DIR, 'uploads', 'resume'),
+    dataDir: path.join(DATA_DIR, 'uploads', 'data'),
+    resumeDir: path.join(DATA_DIR, 'uploads', 'resume'),
   },
 
   validateMx: bool(process.env.VALIDATE_MX, false),
-  dbFile: process.env.DB_FILE || path.join(ROOT_DIR, 'data', 'app.db'),
+  dbFile: process.env.DB_FILE || path.join(DATA_DIR, 'data', 'app.db'),
   logDir: path.join(ROOT_DIR, 'logs'),
 };
 

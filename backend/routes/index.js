@@ -1,5 +1,6 @@
 /** All API routes. One router per resource, mounted under /api. */
 import { Router } from 'express';
+import config from '../config/index.js';
 import { asyncHandler as h } from '../utils/errors.js';
 import { dataUpload, resumeUpload } from '../utils/upload.js';
 import * as upload from '../controllers/upload.controller.js';
@@ -63,6 +64,9 @@ api.get('/stats', h(stats.stats));
 api.get('/history', h(stats.history));
 api.get('/settings', h(stats.getSettings));
 api.put('/settings', h(stats.updateSettings));
-api.get('/health', (req, res) => res.json({ ok: true }));
+// /health is open (no password) so hosts can health-check and the dashboard knows whether to show the login screen.
+api.get('/health', (req, res) => res.json({ ok: true, authRequired: Boolean(config.appPassword) }));
+// Reaching this route means the password was accepted by requireAuth.
+api.get('/auth/check', (req, res) => res.json({ ok: true }));
 
 export default api;

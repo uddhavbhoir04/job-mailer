@@ -1,6 +1,7 @@
 /** Dashboard: wires panels together, polls campaign progress, manages toasts and modals. */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from './api.js';
+import { api, auth, API_BASE } from './api.js';
+import Login from './components/Login.jsx';
 import StatsCards from './components/StatsCards.jsx';
 import UploadPanel from './components/UploadPanel.jsx';
 import ResumePanel from './components/ResumePanel.jsx';
@@ -20,7 +21,7 @@ const TABS = [
   { id: 'suppressions', label: 'Unsubscribes' },
 ];
 
-export default function App() {
+function Dashboard({ authRequired, onLogout }) {
   const [tab, setTab] = useState('records');
   const [stats, setStats] = useState(null);
   const [settings, setSettings] = useState(null);
@@ -145,13 +146,14 @@ export default function App() {
               Gmail {settings.smtpConfigured ? 'configured' : 'not configured'}
             </span>
             <span className={`badge ${settings.dryRun ? 'bg-sky-100 text-sky-700' : 'bg-rose-100 text-rose-700'}`}>{settings.dryRun ? 'DRY RUN' : 'LIVE'}</span>
+            {authRequired && <button className="btn-ghost py-0.5 text-xs" onClick={onLogout}>Log out</button>}
           </div>
         )}
       </header>
 
       {backendDown && (
         <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
-          Cannot reach the backend. Start it with <code>cd backend &amp;&amp; npm run dev</code>.
+          Cannot reach the backend{API_BASE ? <> at <code>{API_BASE}</code> (a free Render instance can take ~1 minute to wake up)</> : <>. Start it with <code>cd backend &amp;&amp; npm run dev</code></>}.
         </div>
       )}
 
@@ -231,5 +233,63 @@ export default function App() {
 
       <Toasts toasts={toasts} dismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))} />
     </div>
+  );
+}
+
+/**
+ * Gate: waits for the backend (free hosts can take ~1 min to wake up), then shows the
+ * login screen if the backend requires APP_PASSWORD, otherwise the dashboard.
+ */
+export default function App() {
+  const [state, setState] = useState('connecting'); // connecting | login | ready
+  const [authRequired, setAuthRequired] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    auth.onUnauthorized = () => setState('login');
+  }, []);
+
+  useEffect(() => {
+    if (state !== 'connecting') return undefined;
+    let cancelled = false;
+    let timer;
+    (async () => {
+      try {
+        const h = await api.health();
+        if (cancelled) return;
+        setAuthRequired(h.authRequired);
+        if (!h.authRequired) return setState('ready');
+        const saved = auth.get();
+        setState(saved && (await api.checkPassword(saved)) ? 'ready' : 'login');
+      } catch {
+        if (!cancelled) timer = setTimeout(() => setAttempt((a) => a + 1), 5000);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [state, attempt]);
+
+  if (state === 'connecting') {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4 text-center text-sm text-slate-500">
+        <div>
+          <div className="mb-2 text-2xl">⏳</div>
+          Connecting to the backend{API_BASE ? ` at ${API_BASE}` : ''}…
+          {attempt > 0 && <div className="mt-1 text-xs">Still waiting (attempt {attempt + 1}). A sleeping free instance can take about a minute to start.</div>}
+        </div>
+      </div>
+    );
+  }
+  if (state === 'login') return <Login onSuccess={() => setState('ready')} />;
+  return (
+    <Dashboard
+      authRequired={authRequired}
+      onLogout={() => {
+        auth.clear();
+        setState('login');
+      }}
+    />
   );
 }

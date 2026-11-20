@@ -24,6 +24,20 @@ export default function ResumePanel({ resume, maxMb = 5, onChange, notify }) {
     }
   }
 
+  async function view() {
+    // Open the tab synchronously (avoids popup blockers), then load the PDF into it.
+    const tab = window.open('', '_blank');
+    try {
+      const url = await api.resumeBlobUrl();
+      if (tab) tab.location.href = url;
+      else window.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+      tab?.close();
+      notify(e.message, 'error');
+    }
+  }
+
   async function remove() {
     if (!window.confirm('Remove the resume? Emails cannot be sent without it.')) return;
     await api.deleteResume().catch((e) => notify(e.message, 'error'));
@@ -42,7 +56,7 @@ export default function ResumePanel({ resume, maxMb = 5, onChange, notify }) {
               {(resume.size / 1024).toFixed(0)} KB · {formatDate(resume.uploadedAt)}
             </div>
           </div>
-          <a className="btn-ghost" href="/api/resume/file" target="_blank" rel="noreferrer">View</a>
+          <button className="btn-ghost" onClick={view}>View</button>
         </div>
       ) : (
         <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">No resume uploaded – required before sending.</div>
