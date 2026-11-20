@@ -15,7 +15,22 @@ const int = (v, def) => {
   return Number.isFinite(n) && n >= 0 ? n : def;
 };
 
-export const isProduction = process.env.NODE_ENV === 'production';
+// Render / Railway / Fly / Heroku set these automatically.
+export const onHostingPlatform = Boolean(
+  process.env.RENDER || process.env.RAILWAY_ENVIRONMENT || process.env.FLY_APP_NAME || process.env.DYNO,
+);
+export const isProduction = process.env.NODE_ENV === 'production' || onHostingPlatform;
+
+/**
+ * On a hosting platform the server MUST listen on 0.0.0.0, even if HOST=127.0.0.1 was
+ * copied from a local .env (the platform could not reach it: "No open ports detected").
+ */
+function resolveHost() {
+  const h = process.env.HOST;
+  const loopback = !h || ['127.0.0.1', 'localhost', '::1'].includes(h);
+  if (onHostingPlatform && loopback) return '0.0.0.0';
+  return h || (isProduction ? '0.0.0.0' : '127.0.0.1');
+}
 
 // Where the database and uploads live. Point this at a persistent disk in production.
 const DATA_DIR = path.resolve(process.env.DATA_DIR || ROOT_DIR);
@@ -24,7 +39,7 @@ const config = {
   port: int(process.env.PORT, 5000),
   // Hosts (Render, Railway…) must reach the server from outside the container -> 0.0.0.0.
   // Locally we stay on 127.0.0.1 so the API is not exposed on your network.
-  host: process.env.HOST || (isProduction ? '0.0.0.0' : '127.0.0.1'),
+  host: resolveHost(),
   // Comma-separated list of allowed browser origins (your Vercel URL, localhost…).
   frontendOrigins: (process.env.FRONTEND_ORIGIN || 'http://localhost:5173')
     .split(',')
