@@ -106,6 +106,27 @@ Credentials are read only by `backend/config/index.js`. They are never returned 
 
 ---
 
+### Gmail API setup (needed on Render's free plan)
+
+Render's free plan blocks outgoing SMTP ports (25, 465, 587), so App Password sending times out there with `Connection timeout`. The Gmail API sends over HTTPS (port 443) instead. Mail still comes from your Gmail account and appears in your Sent folder. This is a one-time setup of about 10 minutes.
+
+1. **Create a project.** Open <https://console.cloud.google.com/>, create a project (e.g. `job-mailer`), and select it.
+2. **Enable the API.** Go to **APIs & Services → Library**, search for **Gmail API**, and click **Enable**.
+3. **Set up the consent screen** under **Google Auth Platform** (or **OAuth consent screen**):
+   - **Branding:** set an app name (e.g. `Job Mailer`) and your email.
+   - **Audience:** choose **External**, then **Publish app** so the status is **In production**. In *Testing* status, Google expires your authorization after 7 days.
+   - **Data access:** **Add or remove scopes** → `https://www.googleapis.com/auth/gmail.send`.
+4. **Create the OAuth client.** Go to **Credentials → Create credentials → OAuth client ID**, choose **Desktop app**, and click **Create**. Copy the **Client ID** and **Client secret**.
+5. **Get the refresh token.** On your computer, put the values in `backend/.env`:
+   ```env
+   GMAIL_OAUTH_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
+   GMAIL_OAUTH_CLIENT_SECRET=GOCSPX-xxxxxxxx
+   ```
+   Then run `cd backend && npm run gmail:auth`. A browser opens: sign in with the Gmail you send from. Google warns *"Google hasn't verified this app"*; because it's your own app, click **Advanced → Go to Job Mailer (unsafe)**, then **Continue**. The terminal prints `GMAIL_OAUTH_REFRESH_TOKEN=...`.
+6. **Add these to Render → Environment:** `GMAIL_USER`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, `GMAIL_OAUTH_REFRESH_TOKEN`. When all three OAuth values are set, the app uses the API automatically, and Settings shows **via Gmail API**.
+
+The app only asks for permission to **send** mail. It can't read your inbox. You can revoke access anytime at <https://myaccount.google.com/permissions>. If sending later fails with *"authorization failed (invalid_grant)"*, run `npm run gmail:auth` again and update the token on Render.
+
 ## 4. Running locally
 
 ```bash
