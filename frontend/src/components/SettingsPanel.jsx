@@ -67,22 +67,14 @@ export default function SettingsPanel({ settings, onChange, notify }) {
         <div className="flex items-center justify-between">
           <span>
             Gmail:{' '}
-            {settings.smtpConfigured ? (
-              <>
-                <b>{settings.gmailUser}</b> <span className="text-xs text-slate-500">via {settings.sendMethod === 'api' ? 'Gmail API' : 'SMTP'}</span>
-              </>
-            ) : (
-              <span className="text-rose-600">not configured on the server</span>
-            )}
+            {settings.smtpConfigured ? <b>{settings.gmailUser}</b> : <span className="text-rose-600">not configured in backend/.env</span>}
           </span>
           <button className="btn-ghost text-xs" onClick={verify} disabled={!settings.smtpConfigured || smtp?.checking}>
-            {smtp?.checking ? 'Checking…' : 'Verify Gmail'}
+            {smtp?.checking ? 'Checking…' : 'Verify SMTP'}
           </button>
         </div>
         {smtp && !smtp.checking && (
-          <div className={`mt-1 text-xs ${smtp.ok ? 'text-emerald-600' : 'text-rose-600'}`}>
-            {smtp.ok ? `✓ Connected to Gmail (${smtp.method === 'api' ? 'Gmail API' : 'SMTP'})` : smtp.error}
-          </div>
+          <div className={`mt-1 text-xs ${smtp.ok ? 'text-emerald-600' : 'text-rose-600'}`}>{smtp.ok ? '✓ Connected to Gmail' : smtp.error}</div>
         )}
         <label className="mt-2 flex items-center gap-2">
           <input type="checkbox" checked={settings.dryRun} disabled={settings.dryRunLockedByEnv} onChange={(e) => toggleDryRun(e.target.checked)} />

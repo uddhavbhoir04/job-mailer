@@ -53,14 +53,6 @@ const config = {
     user: (process.env.GMAIL_USER || '').trim(),
     // Google shows app passwords as "abcd efgh ijkl mnop" – strip the spaces.
     appPassword: (process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, ''),
-    // Gmail API (HTTPS, port 443). Needed on hosts that block SMTP ports, e.g. Render free plan.
-    oauth: {
-      clientId: (process.env.GMAIL_OAUTH_CLIENT_ID || '').trim(),
-      clientSecret: (process.env.GMAIL_OAUTH_CLIENT_SECRET || '').trim(),
-      refreshToken: (process.env.GMAIL_OAUTH_REFRESH_TOKEN || '').trim(),
-    },
-    // 'api' | 'smtp' | '' (auto: API when the OAuth values are set, otherwise SMTP)
-    sendMethod: (process.env.GMAIL_SEND_METHOD || '').trim().toLowerCase(),
   },
 
   sender: {
@@ -91,17 +83,7 @@ const config = {
   logDir: path.join(ROOT_DIR, 'logs'),
 };
 
-const apiReady = () => Boolean(config.gmail.oauth.clientId && config.gmail.oauth.clientSecret && config.gmail.oauth.refreshToken);
-
-/** 'api' (Gmail API over HTTPS) or 'smtp' (smtp.gmail.com with App Password). */
-export const sendMethod = () => {
-  if (config.gmail.sendMethod === 'api' || config.gmail.sendMethod === 'smtp') return config.gmail.sendMethod;
-  return apiReady() ? 'api' : 'smtp';
-};
-
-/** True when Gmail sending is configured for the active method. (Name kept for existing callers.) */
-export const smtpConfigured = () =>
-  Boolean(config.gmail.user && (sendMethod() === 'api' ? apiReady() : config.gmail.appPassword));
+export const smtpConfigured = () => Boolean(config.gmail.user && config.gmail.appPassword);
 
 /** Safe, credential-free view of the config for the frontend. */
 export const publicConfig = () => {
@@ -109,7 +91,6 @@ export const publicConfig = () => {
   const masked = u ? u.replace(/^(.{2}).*(@.*)$/, '$1***$2') : null;
   return {
     smtpConfigured: smtpConfigured(),
-    sendMethod: sendMethod(),
     gmailUser: masked,
     dryRun: config.sending.dryRun,
     maxUploadMb: config.uploads.maxUploadBytes / 1048576,

@@ -15,7 +15,7 @@ const { extractFromExcel } = await import('../services/excelExtraction.service.j
 const { storeRecords, parseManualText, importManual } = await import('../services/recordImport.service.js');
 const Recruiters = await import('../models/recruiter.model.js');
 const { DEFAULT_TEMPLATE, DEFAULT_GENERIC_TEMPLATE, templateKindFor, templateFor, getTemplate, saveTemplate } = await import('../models/template.model.js');
-const { classifyError, sendMail, verifySmtp } = await import('../services/gmail.service.js');
+const { classifyError } = await import('../services/gmail.service.js');
 const { getSendSettings, setSetting } = await import('../models/settings.model.js');
 const configMod = (await import('../config/index.js')).default;
 const { EXPECTED } = await import('../sample-data/generate-samples.js');
@@ -167,44 +167,4 @@ test('dry-run: DRY_RUN is the default, the dashboard checkbox overrides it, DRY_
   configMod.sending.dryRunLocked = false;
   setSetting('dryRun', true);
   assert.equal(getSendSettings().dryRun, true);
-});
-
-test('Gmail API: builds the raw MIME (one recipient, attachment) and sends over HTTPS (fetch mocked)', async () => {
-  const g = configMod.gmail;
-  const saved = JSON.parse(JSON.stringify(g));
-  Object.assign(g, { user: 'me@gmail.com', appPassword: '', sendMethod: '', oauth: { clientId: 'cid', clientSecret: 'sec', refreshToken: 'rt' } });
-  const calls = [];
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url, opts) => {
-    calls.push({ url: String(url), opts });
-    if (String(url).includes('oauth2.googleapis.com')) return new Response(JSON.stringify({ access_token: 'AT', expires_in: 3600 }), { status: 200 });
-    return new Response(JSON.stringify({ id: 'gmail-msg-1' }), { status: 200 });
-  };
-  try {
-    assert.deepEqual(await verifySmtp(), { ok: true, method: 'api' });
-    const r = await sendMail({
-      to: 'hr@example.com', subject: 'Application – Dev', html: '<p>Hi</p>', text: 'Hi',
-      attachment: { filename: 'Resume.pdf', content: Buffer.from('%PDF-1.4 test') }, senderName: 'Test User', dryRun: false,
-    });
-    assert.deepEqual(r, { messageId: 'gmail-msg-1', dryRun: false });
-    const send = calls.find((c) => c.url.includes('/messages/send'));
-    assert.equal(send.opts.headers.Authorization, 'Bearer AT');
-    const raw = Buffer.from(JSON.parse(send.opts.body).raw, 'base64url').toString();
-    assert.match(raw, /^To: hr@example\.com$/m);
-    assert.doesNotMatch(raw, /^(Cc|Bcc):/m);
-    assert.match(raw, /^From: Test User <me@gmail\.com>$/m);
-    assert.match(raw, /filename=Resume\.pdf/);
-  } finally {
-    globalThis.fetch = realFetch;
-    Object.assign(g, saved);
-  }
-});
-
-test('Gmail API error classification', () => {
-  const e = (status, reason, msg = 'x') => Object.assign(new Error(msg), { apiStatus: status, apiReason: reason });
-  assert.equal(classifyError(e(401, 'invalid_grant')).type, 'auth');
-  assert.equal(classifyError(e(429, 'rateLimitExceeded')).type, 'quota');
-  assert.equal(classifyError(e(403, 'dailyLimitExceeded')).type, 'quota');
-  assert.equal(classifyError(e(503, '')).type, 'temporary');
-  assert.equal(classifyError(e(400, 'invalidArgument')).type, 'permanent');
 });
