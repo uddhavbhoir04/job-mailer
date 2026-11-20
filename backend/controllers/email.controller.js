@@ -2,7 +2,6 @@ import { AppError } from '../utils/errors.js';
 import { smtpConfigured } from '../config/index.js';
 import { verifySmtp } from '../services/gmail.service.js';
 import { sendQueue, sendToRecruiter } from '../services/sendQueue.service.js';
-import { getDefaultTemplate } from '../models/template.model.js';
 import { getSendSettings } from '../models/settings.model.js';
 import { getRecruiter } from '../models/recruiter.model.js';
 import { getResumeAttachment } from '../services/resume.service.js';
@@ -29,7 +28,7 @@ export async function sendOne(req, res) {
   getResumeAttachment();
 
   const force = req.body.force === true; // deliberate resend of an already-sent application
-  const result = await sendToRecruiter(id, { dryRun: settings.dryRun, settings, template: getDefaultTemplate(), force });
+  const result = await sendToRecruiter(id, { dryRun: settings.dryRun, settings, force });
   const status = result.status === 'sent' ? 200 : result.status === 'skipped' ? 409 : 502;
   res.status(status).json({ ...result, recruiter: getRecruiter(id) });
 }

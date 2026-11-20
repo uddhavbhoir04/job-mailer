@@ -12,9 +12,9 @@ const { fileURLToPath } = await import('node:url');
 const { renderEmail, htmlToText } = await import('../services/emailGeneration.service.js');
 const { validateEmail } = await import('../services/emailValidation.service.js');
 const { extractFromExcel } = await import('../services/excelExtraction.service.js');
-const { storeRecords } = await import('../services/recordImport.service.js');
+const { storeRecords, parseManualText, importManual } = await import('../services/recordImport.service.js');
 const Recruiters = await import('../models/recruiter.model.js');
-const { DEFAULT_TEMPLATE } = await import('../models/template.model.js');
+const { DEFAULT_TEMPLATE, DEFAULT_GENERIC_TEMPLATE, templateKindFor, templateFor, getTemplate, saveTemplate } = await import('../models/template.model.js');
 const { classifyError } = await import('../services/gmail.service.js');
 const { EXPECTED } = await import('../sample-data/generate-samples.js');
 
@@ -99,4 +99,58 @@ test('SMTP error classification', () => {
   assert.equal(classifyError({ responseCode: 451 }).type, 'temporary');
   assert.equal(classifyError({ code: 'ETIMEDOUT' }).type, 'temporary');
   assert.equal(classifyError({ responseCode: 550, response: '550 5.1.1 user unknown' }).type, 'permanent');
+});
+
+test('manual text: bare emails, short and full formats, blank lines', () => {
+  const recs = parseManualText(`a@example.com
+
+Bob Lee, bob@example.com
+Cara Diaz, cara@example.com, React Developer, Acme
+7, Dev Rao, dev@example.com, Node.js Developer, Beta Labs`);
+  assert.equal(recs.length, 4);
+  assert.deepEqual(recs[0], { sno: '', name: '', email: 'a@example.com', title: '', company: '' });
+  assert.equal(recs[1].name, 'Bob Lee');
+  assert.deepEqual(recs[2], { sno: '', name: 'Cara Diaz', email: 'cara@example.com', title: 'React Developer', company: 'Acme' });
+  assert.deepEqual(recs[3], { sno: '7', name: 'Dev Rao', email: 'dev@example.com', title: 'Node.js Developer', company: 'Beta Labs' });
+});
+
+test('manual text: tab-separated spreadsheet copy with header (company may contain commas)', () => {
+  const recs = parseManualText('Company\tEmail\tName\tPosition\nAcme, Inc.\thr@acme.example.com\tSam\tDev');
+  assert.deepEqual(recs, [{ sno: '', name: 'Sam', email: 'hr@acme.example.com', title: 'Dev', company: 'Acme, Inc.' }]);
+});
+
+test('manual import: duplicates detected, empty input rejected', async () => {
+  const entry = { records: [{ name: 'Manual Person', email: 'Manual.Person@Example.com', title: 'Dev', company: 'Solo' }] };
+  const first = await importManual(entry);
+  assert.equal(first.inserted, 1);
+  const again = await importManual({ text: 'Manual Person, manual.person@example.com, Dev, Solo' });
+  assert.equal(again.inserted, 0);
+  assert.equal(again.duplicates, 1);
+  await assert.rejects(() => importManual({ text: 'no emails here' }), /No email addresses/);
+  const typo = await importManual({ text: 'Typo Person, typo@company' });
+  assert.equal(typo.inserted, 1);
+  assert.equal(typo.invalid, 1); // kept and flagged, not silently dropped
+});
+
+test('email-only rows get the generic template; rows with title or company get the main one', () => {
+  assert.equal(templateKindFor({ email: 'a@example.com' }), 'generic');
+  assert.equal(templateKindFor({ email: 'a@example.com', name: 'Asha' }), 'generic'); // name alone is not enough
+  assert.equal(templateKindFor({ email: 'a@example.com', company: 'Acme' }), 'main');
+  assert.equal(templateKindFor({ email: 'a@example.com', title: 'Dev' }), 'main');
+  assert.equal(templateFor({ email: 'a@example.com' }).kind, 'generic');
+  assert.equal(templateFor({ email: 'a@example.com', company: 'Acme' }).kind, 'main');
+});
+
+test('generic default template renders cleanly with no data (no title/company warnings)', () => {
+  const r = renderEmail(DEFAULT_GENERIC_TEMPLATE, { email: 'hr@example.com' }, sender);
+  assert.match(r.text, /Best Regards,\nTest User\nFull-Stack Developer\n\+91 90000 00000/);
+  assert.match(r.text, /^Dear Hiring Manager,/);
+  assert.doesNotMatch(r.text, /your company|the open/);
+  assert.deepEqual(r.warnings, ['Missing name; using "Hiring Manager"']);
+});
+
+test('main and generic templates are saved independently', () => {
+  saveTemplate('generic', { subject: 'Generic S', body_html: '<p>G</p>' });
+  assert.equal(getTemplate('generic').subject, 'Generic S');
+  assert.notEqual(getTemplate('main').subject, 'Generic S');
 });

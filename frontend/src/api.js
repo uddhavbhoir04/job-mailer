@@ -30,6 +30,7 @@ export const api = {
   runOcr: () => request('/upload/records/ocr', { method: 'POST' }),
 
   recruiters: (params = {}) => request(`/recruiters?${new URLSearchParams(params)}`),
+  addRecords: ({ records, text }) => request('/recruiters', { method: 'POST', body: { records, text } }),
   updateRecruiter: (id, data) => request(`/recruiters/${id}`, { method: 'PATCH', body: data }),
   deleteRecruiter: (id) => request(`/recruiters/${id}`, { method: 'DELETE' }),
   bulkDelete: (ids) => request('/recruiters/bulk-delete', { method: 'POST', body: { ids } }),
@@ -43,10 +44,11 @@ export const api = {
   uploadResume: (file) => request('/resume', { method: 'POST', form: fileForm('resume', file) }),
   deleteResume: () => request('/resume', { method: 'DELETE' }),
 
-  template: () => request('/templates/default'),
-  saveTemplate: (t) => request('/templates/default', { method: 'PUT', body: t }),
-  resetTemplate: () => request('/templates/reset', { method: 'POST' }),
-  preview: (recruiterId, template) => request('/templates/preview', { method: 'POST', body: { recruiterId, template } }),
+  // kind: 'main' (has title/company) | 'generic' (email-only rows)
+  template: (kind = 'main') => request(`/templates/${kind}`),
+  saveTemplate: (kind, t) => request(`/templates/${kind}`, { method: 'PUT', body: t }),
+  resetTemplate: (kind) => request(`/templates/${kind}/reset`, { method: 'POST' }),
+  preview: (recruiterId, template, kind) => request('/templates/preview', { method: 'POST', body: { recruiterId, template, kind } }),
 
   verifySmtp: () => request('/email/verify'),
   sendOne: (id, force = false) => request(`/email/send-one/${id}`, { method: 'POST', body: { confirm: true, force } }),

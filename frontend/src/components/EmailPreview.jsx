@@ -11,6 +11,8 @@ export default function EmailPreview({ preview }) {
         <dd>{preview.from || <span className="text-rose-600">Gmail not configured</span>}</dd>
         <dt className="text-slate-500">To</dt>
         <dd>{preview.to}</dd>
+        <dt className="text-slate-500">Template</dt>
+        <dd>{preview.templateKind === 'generic' ? 'Email-only (no title / company)' : 'Main'}</dd>
         <dt className="text-slate-500">Subject</dt>
         <dd className="font-medium">{preview.subject}</dd>
         <dt className="text-slate-500">Attachment</dt>

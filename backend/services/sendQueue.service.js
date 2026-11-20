@@ -17,7 +17,7 @@ import { sleep, jitter } from '../utils/sleep.js';
 import logger from '../utils/logger.js';
 import * as Recruiters from '../models/recruiter.model.js';
 import * as Campaigns from '../models/campaign.model.js';
-import { getDefaultTemplate } from '../models/template.model.js';
+import { templateFor, getTemplate } from '../models/template.model.js';
 import { getSendSettings } from '../models/settings.model.js';
 import { renderEmail } from './emailGeneration.service.js';
 import { sendMail, classifyError } from './gmail.service.js';
@@ -30,7 +30,7 @@ const SENDABLE = new Set(['pending', 'failed', 'queued']);
  * Sends the application email to a single recruiter, with retries.
  * Returns { status: 'sent'|'failed'|'skipped'|'quota'|'auth'|'aborted', error?, messageId? }
  */
-export async function sendToRecruiter(id, { campaignId = null, dryRun, settings, template, force = false, stopSignal } = {}) {
+export async function sendToRecruiter(id, { campaignId = null, dryRun, settings, force = false, stopSignal } = {}) {
   const recruiter = Recruiters.getRecruiter(id);
   if (!recruiter) return { status: 'skipped', error: 'Record not found' };
 
@@ -57,7 +57,8 @@ export async function sendToRecruiter(id, { campaignId = null, dryRun, settings,
     return { status: 'auth', error: err.message }; // stops the campaign: nothing can be sent without resume
   }
 
-  const email = renderEmail(template, recruiter, settings);
+  // Rows with no title and no company automatically get the email-only (generic) template.
+  const email = renderEmail(templateFor(recruiter), recruiter, settings);
   const maxAttempts = settings.maxRetries + 1;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -131,7 +132,8 @@ class SendQueue {
     const settings = getSendSettings();
     if (!settings.dryRun && !smtpConfigured()) throw new AppError('Gmail is not configured (backend/.env)', 400);
     getResumeAttachment(); // throws if missing
-    getDefaultTemplate();
+    getTemplate('main');
+    getTemplate('generic');
 
     const ids = [...new Set(recruiterIds.map(Number))];
     const rows = Recruiters.getRecruitersByIds(ids);
@@ -255,7 +257,6 @@ class SendQueue {
           campaignId: s.campaignId,
           dryRun: s.dryRun,
           settings,
-          template: getDefaultTemplate(),
           stopSignal: s.stopCtl.signal,
         });
         s.current = null;

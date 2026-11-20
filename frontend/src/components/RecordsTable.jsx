@@ -155,6 +155,9 @@ export default function RecordsTable({ records, filters, setFilters, selected, s
                   <td className="px-2 py-2">
                     <span className={r.is_valid_email ? '' : 'text-rose-600'}>{r.email}</span>
                     {!r.is_valid_email && <div className="text-xs text-rose-500">{r.validation_error}</div>}
+                    {!(r.title || '').trim() && !(r.company || '').trim() && (
+                      <div><span className="badge mt-0.5 bg-violet-50 text-violet-700" title="No title or company: the email-only template is used">email-only template</span></div>
+                    )}
                   </td>
                   <td className="px-2 py-2">{r.title || <span className="text-slate-300 italic">missing</span>}</td>
                   <td className="max-w-[220px] truncate px-2 py-2" title={r.company}>{r.company || <span className="text-slate-300 italic">missing</span>}</td>

@@ -118,7 +118,7 @@ Or run them separately: `cd backend && npm run dev`, and `cd frontend && npm run
 
 Single-process option: `npm run build && npm start` serves the built dashboard from the backend at http://127.0.0.1:5000.
 
-Tests: `npm test` (17 tests covering extraction, dedupe, template rendering, the never-resend guarantee and SMTP error classification).
+Tests: `npm test` (20 tests covering extraction, dedupe, template rendering, the never-resend guarantee and SMTP error classification).
 
 ---
 
@@ -131,6 +131,12 @@ Click **Upload PDF or Excel**, or drag a file onto the panel. Accepted: `.pdf`, 
 - **Scanned PDFs.** If a PDF has no text layer, the dashboard says so and shows **Run OCR**. OCR takes a few seconds per page, and the first run downloads English language data, so it needs internet once. **Always review OCR results**: misread emails are flagged as invalid and you can fix them with ✏️.
 - **Validation.** Emails are trimmed, lower-cased and checked. Invalid ones are kept but shown in red, can't be selected for sending, and can be fixed with ✏️. Rows without any email are skipped and reported. Set `VALIDATE_MX=true` to also check that each domain has a mail server.
 - **Duplicates.** The upload summary shows found / new / duplicates / invalid. Re-uploading the same file inserts nothing.
+
+**Adding recruiters manually.** Click **＋ Type / paste emails** under the upload area.
+- **Type one:** enter the email (required) plus name, title and company. Use **Add & add another** to enter several in a row.
+- **Paste a list:** one recruiter per line, as `email`, `Name, email` or `Name, email, Title, Company`. You can also paste rows copied from Excel or Google Sheets, with or without a header row.
+
+Typed entries go through the same checks as uploads (validation, duplicates, unsubscribe list). A typo like `name@company` is added but flagged as invalid so you can fix it with ✏️.
 
 In the **Records** tab you can search, filter by status or validity, select individual rows or all sendable rows, edit, delete, preview (👁), send one (✉️), or mark do-not-contact (🚫).
 
@@ -203,6 +209,7 @@ While `.env` has `DRY_RUN=true`, the dashboard can't switch dry-run off. With `D
 POST   /api/upload/records          multipart "file"  → { extracted, inserted, duplicates, invalid, requiresOcr }
 POST   /api/upload/records/ocr      OCR the last scanned PDF
 GET    /api/recruiters?search=&status=&valid=
+POST   /api/recruiters          {records?:[{name,email,title,company}], text?}  (manual entry)
 PATCH  /api/recruiters/:id          DELETE /api/recruiters/:id     POST /api/recruiters/bulk-delete {ids}
 POST   /api/recruiters/:id/unsubscribe
 GET|POST /api/suppressions          DELETE /api/suppressions/:email

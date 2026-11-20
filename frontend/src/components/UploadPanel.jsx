@@ -1,12 +1,14 @@
 /** Upload recruiter data (PDF / XLSX / XLS / CSV) with drag & drop and OCR fallback. */
 import { useRef, useState } from 'react';
 import { api } from '../api.js';
+import AddRecordsModal from './AddRecordsModal.jsx';
 
 export default function UploadPanel({ onImported, notify }) {
   const inputRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
   const [result, setResult] = useState(null);
+  const [manualOpen, setManualOpen] = useState(false);
 
   async function handle(file) {
     if (!file) return;
@@ -63,6 +65,11 @@ export default function UploadPanel({ onImported, notify }) {
         <div className="text-xs text-slate-500">Drop a file or click · .pdf .xlsx .xls .csv · columns: SNo, Name, Email, Title, Company</div>
         <input ref={inputRef} type="file" accept=".pdf,.xlsx,.xls,.csv" className="hidden" onChange={(e) => handle(e.target.files?.[0])} />
       </div>
+
+      <button className="btn-secondary mt-3 w-full" onClick={() => setManualOpen(true)}>
+        ＋ Type / paste emails
+      </button>
+      <AddRecordsModal open={manualOpen} onClose={() => setManualOpen(false)} onAdded={onImported} notify={notify} />
 
       {result && (
         <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">

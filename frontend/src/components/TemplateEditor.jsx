@@ -3,7 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import EmailPreview from './EmailPreview.jsx';
 
+const KINDS = [
+  { id: 'main', label: 'Main template', hint: 'Used when the recruiter has a job title and/or company.' },
+  { id: 'generic', label: 'Email-only template', hint: 'Used automatically when a recruiter has no job title and no company (e.g. pasted email addresses).' },
+];
+const isEmailOnly = (r) => !(r.title || '').trim() && !(r.company || '').trim();
+
 export default function TemplateEditor({ records, notify }) {
+  const [kind, setKind] = useState('main');
   const [tpl, setTpl] = useState(null);
   const [saved, setSaved] = useState(null);
   const [placeholders, setPlaceholders] = useState([]);
@@ -13,8 +20,8 @@ export default function TemplateEditor({ records, notify }) {
   const [busy, setBusy] = useState(false);
   const focused = useRef({ field: 'body_html', el: null });
 
-  const load = async () => {
-    const t = await api.template();
+  const load = async (k = kind) => {
+    const t = await api.template(k);
     const draft = { subject: t.subject, body_html: t.body_html, body_text: t.body_text || '' };
     setTpl(draft);
     setSaved(draft);
@@ -22,20 +29,22 @@ export default function TemplateEditor({ records, notify }) {
     setPlaceholders(t.placeholders);
   };
   useEffect(() => {
-    load().catch((e) => notify(e.message, 'error'));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    setTpl(null);
+    setPreviewId('');
+    load(kind).catch((e) => notify(e.message, 'error'));
+  }, [kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live preview of the unsaved draft (debounced).
   useEffect(() => {
     if (!tpl) return undefined;
     const t = setTimeout(() => {
       api
-        .preview(previewId || undefined, { ...tpl, body_text: useText ? tpl.body_text : '' })
+        .preview(previewId || undefined, { ...tpl, body_text: useText ? tpl.body_text : '' }, kind)
         .then(setPreview)
         .catch(() => {});
     }, 300);
     return () => clearTimeout(t);
-  }, [tpl, previewId, useText]);
+  }, [tpl, previewId, useText, kind]);
 
   if (!tpl) return <div className="py-8 text-center text-sm text-slate-400">Loading template…</div>;
 
@@ -61,7 +70,7 @@ export default function TemplateEditor({ records, notify }) {
   async function save() {
     setBusy(true);
     try {
-      await api.saveTemplate({ ...tpl, body_text: useText ? tpl.body_text : '' });
+      await api.saveTemplate(kind, { ...tpl, body_text: useText ? tpl.body_text : '' });
       await load();
       notify('Template saved', 'success');
     } catch (e) {
@@ -73,12 +82,29 @@ export default function TemplateEditor({ records, notify }) {
 
   async function reset() {
     if (!window.confirm('Reset to the default template? Your changes will be lost.')) return;
-    await api.resetTemplate();
+    await api.resetTemplate(kind);
     await load();
     notify('Template reset', 'success');
   }
 
+  const matching = records.filter((r) => (kind === 'generic' ? isEmailOnly(r) : !isEmailOnly(r)));
+  const switchKind = (k) => {
+    if (k === kind) return;
+    if (dirty && !window.confirm('You have unsaved changes. Discard them?')) return;
+    setKind(k);
+  };
+
   return (
+    <div>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {KINDS.map((k) => (
+          <button key={k.id} className={kind === k.id ? 'btn-primary' : 'btn-secondary'} onClick={() => switchKind(k.id)}>
+            {k.label}
+            <span className="badge bg-white/20 px-1.5">{records.filter((r) => (k.id === 'generic' ? isEmailOnly(r) : !isEmailOnly(r))).length}</span>
+          </button>
+        ))}
+        <span className="text-xs text-slate-500">{KINDS.find((k) => k.id === kind).hint}</span>
+      </div>
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-3">
         <div>
@@ -115,16 +141,17 @@ export default function TemplateEditor({ records, notify }) {
       <div>
         <label className="label">Preview as</label>
         <select className="input mb-3" value={previewId} onChange={(e) => setPreviewId(e.target.value)}>
-          <option value="">Sample recruiter (Jane Doe, Example Corp)</option>
-          {records.map((r) => (
+          <option value="">{kind === 'generic' ? 'Sample: email only (hr@example.com)' : 'Sample recruiter (Jane Doe, Example Corp)'}</option>
+          {matching.map((r) => (
             <option key={r.id} value={r.id}>
-              {r.name || '(no name)'} – {r.title || '(no title)'} @ {r.company || '(no company)'}
+              {kind === 'generic' ? `${r.email}${r.name ? ` (${r.name})` : ''}` : `${r.name || '(no name)'} – ${r.title || '(no title)'} @ ${r.company || '(no company)'}`}
             </option>
           ))}
         </select>
         <EmailPreview preview={preview} />
         {dirty && <p className="mt-2 text-xs text-amber-600">Preview shows unsaved changes. Save before sending.</p>}
       </div>
+    </div>
     </div>
   );
 }

@@ -89,6 +89,12 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 `;
 
+/** Small additive migrations for databases created by older versions. */
+function migrate(conn) {
+  const cols = conn.prepare('PRAGMA table_info(email_templates)').all().map((c) => c.name);
+  if (!cols.includes('kind')) conn.exec("ALTER TABLE email_templates ADD COLUMN kind TEXT NOT NULL DEFAULT 'main'");
+}
+
 export function getDb() {
   if (db) return db;
   if (config.dbFile !== ':memory:') fs.mkdirSync(path.dirname(config.dbFile), { recursive: true });
@@ -96,6 +102,7 @@ export function getDb() {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
 }
 

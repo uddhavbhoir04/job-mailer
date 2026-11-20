@@ -70,10 +70,14 @@ export function renderEmail(template, recruiter, sender) {
     : { out: htmlToText(html.out), unknown: [] };
 
   const warnings = [];
-  for (const f of ['name', 'title', 'company']) if (!(recruiter[f] || '').trim()) warnings.push(`Missing ${f}; using "${FALLBACKS[f]}"`);
+  const all = `${template.subject} ${template.body_html} ${template.body_text || ''}`;
+  for (const f of ['name', 'title', 'company']) {
+    const used = new RegExp(`\\{\\{\\s*${f}\\s*\\}\\}`, 'i').test(all);
+    if (used && !(recruiter[f] || '').trim()) warnings.push(`Missing ${f}; using "${FALLBACKS[f]}"`);
+  }
   const unknown = [...new Set([...subject.unknown, ...html.unknown, ...text.unknown])];
   if (unknown.length) warnings.push(`Unknown placeholders removed: ${unknown.map((u) => `{{${u}}}`).join(', ')}`);
-  if (!sender.senderName) warnings.push('Sender name is not set (Settings)');
+  if (!sender.senderName && /\{\{\s*sendername\s*\}\}/i.test(all)) warnings.push('Sender name is not set (Settings)');
 
   return { subject: subject.out.replace(/\s+/g, ' ').trim(), html: html.out, text: text.out, warnings };
 }

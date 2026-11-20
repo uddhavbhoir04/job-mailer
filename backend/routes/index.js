@@ -16,6 +16,7 @@ const uploadRouter = Router()
 
 const recruiterRouter = Router()
   .get('/', h(recruiters.list))
+  .post('/', h(recruiters.create))
   .post('/bulk-delete', h(recruiters.bulkRemove))
   .patch('/:id', h(recruiters.update))
   .delete('/:id', h(recruiters.remove))
@@ -27,10 +28,11 @@ const suppressionRouter = Router()
   .delete('/:email', h(recruiters.removeSuppressionCtl));
 
 const templateRouter = Router()
-  .get('/default', h(templates.getTemplate))
-  .put('/default', h(templates.saveTemplate))
-  .post('/reset', h(templates.resetTemplate))
-  .post('/preview', h(templates.preview));
+  .post('/preview', h(templates.preview))
+  .post('/reset', h((req, res) => templates.resetTemplateCtl({ ...req, params: { kind: 'main' } }, res))) // legacy
+  .get('/:kind', h(templates.getTemplateCtl)) // kind = main | generic | default
+  .put('/:kind', h(templates.saveTemplateCtl))
+  .post('/:kind/reset', h(templates.resetTemplateCtl));
 
 const resumeRouter = Router()
   .get('/', h(resume.info))

@@ -3,6 +3,7 @@ import * as Recruiters from '../models/recruiter.model.js';
 import { validateEmail } from '../services/emailValidation.service.js';
 import { addSuppression, removeSuppression, listSuppressions, isSuppressed } from '../services/tracking.service.js';
 import { dedupeKey } from '../utils/hash.js';
+import { importManual } from '../services/recordImport.service.js';
 
 const getOr404 = (id) => {
   const r = Recruiters.getRecruiter(Number(id));
@@ -13,6 +14,20 @@ const getOr404 = (id) => {
 /** GET /api/recruiters?search=&status=&valid=&sort=&dir= */
 export function list(req, res) {
   res.json(Recruiters.listRecruiters(req.query));
+}
+
+/**
+ * POST /api/recruiters  { records?: [{ sno, name, email, title, company }], text?: string }
+ * Manually typed single recruiter(s) and/or a pasted list.
+ */
+export async function create(req, res) {
+  const { records, text } = req.body || {};
+  if (text !== undefined && typeof text !== 'string') throw new AppError('text must be a string', 400);
+  const result = await importManual({ records, text });
+  res.status(result.inserted ? 201 : 200).json({
+    ...result,
+    message: `Added ${result.inserted} recruiter(s); ${result.duplicates} duplicate(s) skipped; ${result.invalid} with invalid email.`,
+  });
 }
 
 /** PATCH /api/recruiters/:id  – edit name/email/title/company/sno */
