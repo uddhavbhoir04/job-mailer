@@ -1,0 +1,11 @@
+node_modules/
+.env
+/data/
+logs/*
+!logs/.gitkeep
+uploads/data/*
+uploads/resume/*
+!uploads/**/.gitkeep
+
+# tesseract.js language data cache (downloaded on first OCR run)
+*.traineddata
